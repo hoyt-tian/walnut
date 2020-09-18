@@ -8,6 +8,7 @@ import com.hao.walnut.log.LogInstanceConfig;
 import lombok.extern.slf4j.Slf4j;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Future;
 import java.util.function.Consumer;
 
@@ -15,7 +16,7 @@ import java.util.function.Consumer;
 public class WALServerImpl implements WALServer {
 
 
-    Map<String, LogInstance> logInstanceMap = new HashMap<>();
+    Map<String, LogInstance> logInstanceMap = new ConcurrentHashMap<>();
 
     private String workspace = "./";
 
@@ -30,7 +31,7 @@ public class WALServerImpl implements WALServer {
     }
 
     protected LogInstance getLogInstance(String fd) throws WALException {
-        if (logInstanceMap.containsKey(fd) == false) {
+        if (!logInstanceMap.containsKey(fd)) {
             int retry = 0;
             int maxRetry = 10;
             while(retry < maxRetry) {
@@ -44,7 +45,7 @@ public class WALServerImpl implements WALServer {
                 } catch (WALException e) {
                     retry++;
                     try {
-                        Thread.sleep(10);
+                        Thread.sleep(2);
                     } catch (InterruptedException interruptedException) {
                         log.error("{}", interruptedException.getMessage());
                         break;

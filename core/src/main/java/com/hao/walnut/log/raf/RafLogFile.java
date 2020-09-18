@@ -5,6 +5,7 @@ import com.hao.walnut.log.AbstractLogFile;
 import lombok.extern.slf4j.Slf4j;
 
 import java.io.File;
+import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.RandomAccessFile;
 
@@ -14,12 +15,11 @@ public class RafLogFile extends AbstractLogFile {
 
     public RafLogFile(File file) throws WALException {
         super(file);
-    }
-
-    @Override
-    protected void createFile(File file) throws IOException {
-        super.createFile(file);
-        this.randomAccessFile = new RandomAccessFile(file, "rw");
+        try {
+            this.randomAccessFile = new RandomAccessFile(file, "rw");
+        } catch (FileNotFoundException e) {
+            throw new WALException(e.getMessage());
+        }
     }
 
     @Override

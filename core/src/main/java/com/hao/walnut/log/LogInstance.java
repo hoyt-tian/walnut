@@ -51,8 +51,23 @@ public class LogInstance {
         String dataFileName = String.format("%s%s%s.dat", logInstanceConfig.workspace, File.separator, logInstanceConfig.fileName);
         String idxFileName = String.format("%s%s%s.idx", logInstanceConfig.workspace, File.separator, logInstanceConfig.fileName);
 
-        logDataFile = LogFileFactory.createLogDataFile(dataFileName, logInstanceConfig.mode);
-        logIndexFile = LogFileFactory.createLogIndexFile(idxFileName, logInstanceConfig.mode);
+        if (checkWorkspace(logInstanceConfig.workspace)) {
+            logDataFile = LogFileFactory.createLogDataFile(dataFileName, logInstanceConfig.mode);
+            logIndexFile = LogFileFactory.createLogIndexFile(idxFileName, logInstanceConfig.mode);
+        } else {
+            throw new WALException("check workspace={} Fail", logInstanceConfig.workspace);
+        }
+    }
+
+    protected boolean checkWorkspace(String path) {
+        File workspace = new File(path);
+        if (!workspace.exists()) {
+            workspace.mkdirs();
+        }
+        if (workspace.exists()) {
+            return true;
+        }
+        return false;
     }
 
     /**
