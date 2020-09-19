@@ -13,11 +13,11 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.concurrent.Future;
 import java.util.concurrent.atomic.AtomicInteger;
-import java.util.concurrent.locks.ReentrantLock;
+
 
 @Slf4j
 public class MappedFile {
-    static final int DefaultRangeSize = Integer.MAX_VALUE >> 8;
+    static final int DefaultRangeSize = 1024 * 1024 * 200;
 
     protected FileChannel fileChannel;
     protected RandomAccessFile randomAccessFile;

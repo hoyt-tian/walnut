@@ -8,6 +8,7 @@ import org.junit.Test;
 import java.io.File;
 import java.io.IOException;
 import java.util.concurrent.*;
+import java.util.concurrent.atomic.AtomicInteger;
 
 @Slf4j
 public class MappedFilePerformance {
@@ -23,8 +24,8 @@ public class MappedFilePerformance {
         StringBuilder sb = new StringBuilder();
 
         sb.append("start=========");
-        for(int i = 0; i < 128; i++) {
-            sb.append((char)i);
+        for(int i = 0; i < 2048; i++) {
+            sb.append((char)(i%128));
         }
         sb.append("========finish");
         testString = sb.toString();
@@ -32,25 +33,27 @@ public class MappedFilePerformance {
 
     @Test
     public void testInsertion() throws IOException, InterruptedException, ExecutionException {
-        MappedFile mappedFile = new MappedFile(data, 512);
+        MappedFile mappedFile = new MappedFile(data);
         ExecutorService executorService = Executors.newCachedThreadPool();
-        int Max = 100;
+        int Max = 1000000;
+        final AtomicInteger lock = new AtomicInteger();
         long start = System.currentTimeMillis();
         for(int i = 0; i < Max; i++) {
             final int idx = i;
             executorService.execute(() -> {
                 try {
 //                    log.info("try to append {}", idx);
-                      mappedFile.append(testString.getBytes()).get(100, TimeUnit.MILLISECONDS);
+                      mappedFile.append(testString.getBytes()).get();
 //                    log.info("finish append {}", idx);
-                } catch (IOException | InterruptedException | ExecutionException | TimeoutException e) {
+                    lock.incrementAndGet();
+                } catch (IOException | InterruptedException | ExecutionException e) {
                     log.error("{}", e.getMessage());
                     e.printStackTrace();
                 }
             });
         }
         executorService.shutdown();
-        while(!executorService.isTerminated()) {
+        while(lock.get() < Max) {
             Thread.sleep(100);
         }
         mappedFile.close();
@@ -59,7 +62,7 @@ public class MappedFilePerformance {
 
     @AfterClass
     public static void teardown() {
-//        data.delete();
-//        temp.delete();
+        data.delete();
+        temp.delete();
     }
 }

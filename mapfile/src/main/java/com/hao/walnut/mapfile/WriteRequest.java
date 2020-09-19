@@ -17,7 +17,7 @@ public class WriteRequest {
     ByteBuffer data;
     MappedRange mappedRange;
     List<WriteRequest> children;
-    static ExecutorService executorService = Executors.newCachedThreadPool();
+    static ExecutorService executorService = Executors.newFixedThreadPool(128);
 
     /**
      * 调度写入操作
@@ -25,7 +25,7 @@ public class WriteRequest {
      */
     public Future<WriteResponse> execute() {
         if (children == null) {
-            log.info("execute single insertion @={}, size={}", this.position + mappedRange.startOffset,data.capacity());
+//            log.info("execute single insertion @={}, size={}", this.position + mappedRange.startOffset,data.capacity());
             return executorService.submit(() -> {
                 WriteResponse writeResponse = new WriteResponse();
                 writeResponse.writeRequest = this;
@@ -42,7 +42,7 @@ public class WriteRequest {
         } else {
             WriteRequest left = children.get(0);
             WriteRequest right = children.get(1);
-            log.info("execute insertion with children, left=[@={},size={}], right=[@={},size={}]",left.position + left.mappedRange.startOffset, left.data.capacity(), right.position + right.mappedRange.startOffset, right.data.capacity());
+//            log.info("execute insertion with children, left=[@={},size={}], right=[@={},size={}]",left.position + left.mappedRange.startOffset, left.data.capacity(), right.position + right.mappedRange.startOffset, right.data.capacity());
             return executorService.submit(() -> {
                 WriteResponse response = new WriteResponse();
                 response.writeRequest = this;
