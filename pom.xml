@@ -9,6 +9,8 @@
     <packaging>pom</packaging>
     <version>${revision}</version>
     <modules>
+        <module>log</module>
+        <module>mapfile</module>
         <module>core</module>
     </modules>
 
@@ -26,6 +28,12 @@
 
     <dependencyManagement>
     <dependencies>
+        <dependency>
+            <groupId>com.hao</groupId>
+            <artifactId>core</artifactId>
+            <version>${revision}</version>
+        </dependency>
+
         <dependency>
             <groupId>org.slf4j</groupId>
             <artifactId>slf4j-api</artifactId>
