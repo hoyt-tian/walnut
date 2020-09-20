@@ -37,7 +37,7 @@ public class MappedFilePerformanceTest {
         mappedFileConf.file = data;
         MappedFile mappedFile = new MappedFile(mappedFileConf);
         ExecutorService executorService = Executors.newCachedThreadPool();
-        int Max = 100000;
+        int Max = 10000;
         final AtomicInteger lock = new AtomicInteger();
         long start = System.currentTimeMillis();
         for(int i = 0; i < Max; i++) {

@@ -35,6 +35,38 @@ public class MappedFile {
         this.fileChannel = this.randomAccessFile.getChannel();
         this.rangeSize = mappedFileConf.rangeSize;
         this.writeExecutor = Executors.newFixedThreadPool(mappedFileConf.maxWriteThread);
+        Runtime.getRuntime().addShutdownHook(new Thread(() -> {
+            try {
+                this.close();
+            } catch (IOException e) {
+                log.error("{}", e.getMessage());
+            }
+        }));
+    }
+
+    /**
+     * 当前已经commit过的FileSize
+     * @return
+     */
+    public long currentCommitFileSize() {
+        long fileSize = 0;
+        for(MappedRange mappedRange : this.mappedRangeList) {
+            fileSize += mappedRange.commitPosition.get();
+        }
+        return fileSize;
+    }
+
+
+    /**
+     * 当前已经预写入的FileSize
+     * @return
+     */
+    public long currentWriteFileSize() {
+        long fileSize = 0;
+        for(MappedRange mappedRange : this.mappedRangeList) {
+            fileSize += mappedRange.writePosition.get();
+        }
+        return fileSize;
     }
 
     public int readInt(long position) throws IOException {
@@ -78,7 +110,6 @@ public class MappedFile {
     }
 
     public synchronized Future<WriteResponse> append(byte[] val) throws IOException {
-//        reentrantLock.lock();
         MappedRange startRange = lastRange();
         int position = startRange.writePosition.get();
         MappedRange endRange = getRange(startRange.startOffset + position + val.length);
@@ -108,7 +139,6 @@ public class MappedFile {
             w2.mappedRange = endRange;
             writeRequest.children.add(w2);
         }
-//        reentrantLock.unlock();
         return execute(writeRequest);
     }
 
@@ -218,13 +248,17 @@ public class MappedFile {
     }
 
     public void close() throws IOException {
-        long fileSize = 0;
-        for(MappedRange mappedRange : this.mappedRangeList) {
-            fileSize += mappedRange.commitPosition.get();
+        if (fileChannel.isOpen()) {
+            long fileSize = currentCommitFileSize();
+            randomAccessFile.setLength(fileSize);
+            fileChannel.close();
+            randomAccessFile.close();
         }
-        randomAccessFile.setLength(fileSize);
-        log.info("fileSize cv = {}, real = {}", fileSize, randomAccessFile.length());
-        fileChannel.close();
-        randomAccessFile.close();
+    }
+
+    @Override
+    protected void finalize() throws Throwable {
+        super.finalize();
+        this.close();
     }
 }

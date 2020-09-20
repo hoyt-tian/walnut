@@ -1,10 +1,10 @@
 package com.hao.walnut.mapfile;
 
-import lombok.extern.slf4j.Slf4j;
+import lombok.Getter;
 import java.nio.ByteBuffer;
 import java.util.List;
 
-@Slf4j
+@Getter
 public class WriteRequest {
     int position;
     ByteBuffer data;

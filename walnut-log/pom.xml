@@ -24,7 +24,7 @@
 
         <dependency>
             <groupId>com.hao</groupId>
-            <artifactId>walnut-core</artifactId>
+            <artifactId>walnut-mapfile</artifactId>
         </dependency>
     </dependencies>
 

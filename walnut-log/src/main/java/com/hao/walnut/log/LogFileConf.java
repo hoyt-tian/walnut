@@ -3,10 +3,10 @@ package com.hao.walnut.log;
 import lombok.Getter;
 import lombok.Setter;
 
-@Getter
 @Setter
-public class LogInstanceConfig {
+@Getter
+public class LogFileConf {
     String workspace;
     String fileName;
-    String mode = LogFileFactory.Mode_Raf;
+    int maxThread = 4;
 }

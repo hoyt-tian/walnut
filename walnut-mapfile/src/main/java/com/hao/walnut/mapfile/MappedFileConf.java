@@ -1,7 +1,12 @@
 package com.hao.walnut.mapfile;
 
+import lombok.Getter;
+import lombok.Setter;
+
 import java.io.File;
 
+@Getter
+@Setter
 public class MappedFileConf {
     static final int DefaultRangeSize = 1024 * 1024 * 200;
 
