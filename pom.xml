@@ -26,6 +26,7 @@
         <maven.source.plugin.version>2.0.2</maven.source.plugin.version>
         <maven.compiler.plugin.version>3.6.0</maven.compiler.plugin.version>
         <maven.jar.plugin.version>2.2</maven.jar.plugin.version>
+        <flatten.maven.plugin.version>1.2.5</flatten.maven.plugin.version>
     </properties>
 
     <dependencyManagement>
@@ -160,6 +161,31 @@
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-surefire-plugin</artifactId>
+            </plugin>
+            <plugin>
+                <groupId>org.codehaus.mojo</groupId>
+                <artifactId>flatten-maven-plugin</artifactId>
+                <version>${flatten.maven.plugin.version}</version>
+                <configuration>
+                    <updatePomFile>true</updatePomFile>
+                    <flattenMode>resolveCiFriendliesOnly</flattenMode>
+                </configuration>
+                <executions>
+                    <execution>
+                        <id>flatten</id>
+                        <phase>process-resources</phase>
+                        <goals>
+                            <goal>flatten</goal>
+                        </goals>
+                    </execution>
+                    <execution>
+                        <id>flatten.clean</id>
+                        <phase>clean</phase>
+                        <goals>
+                            <goal>clean</goal>
+                        </goals>
+                    </execution>
+                </executions>
             </plugin>
         </plugins>
     </build>

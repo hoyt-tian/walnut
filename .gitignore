@@ -3,3 +3,4 @@
 **/target/
 **/*.dat
 **/*.idx
+**/.flattened-pom.xml
