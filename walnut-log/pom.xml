@@ -23,10 +23,6 @@
         </dependency>
 
         <dependency>
-            <groupId>com.github.houbb</groupId>
-            <artifactId>junitperf</artifactId>
-        </dependency>
-        <dependency>
             <groupId>com.hao</groupId>
             <artifactId>walnut-core</artifactId>
         </dependency>

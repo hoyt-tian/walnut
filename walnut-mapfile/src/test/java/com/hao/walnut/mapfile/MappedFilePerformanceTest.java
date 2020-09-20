@@ -11,7 +11,7 @@ import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicInteger;
 
 @Slf4j
-public class MappedFilePerformance {
+public class MappedFilePerformanceTest {
     static File temp;
     static File data;
     static String testString;
@@ -41,7 +41,6 @@ public class MappedFilePerformance {
         final AtomicInteger lock = new AtomicInteger();
         long start = System.currentTimeMillis();
         for(int i = 0; i < Max; i++) {
-            final int idx = i;
             executorService.execute(() -> {
                 try {
 //                    log.info("try to append {}", idx);
@@ -56,10 +55,12 @@ public class MappedFilePerformance {
         }
         executorService.shutdown();
         while(lock.get() < Max) {
-            Thread.sleep(100);
+            Thread.sleep(10);
         }
         mappedFile.close();
-        log.info("性能测试完毕{}", System.currentTimeMillis() - start);
+        long timeCost = System.currentTimeMillis() - start;
+        long totalBytes = Max * testString.getBytes().length / (1024 * 1024) ;
+        log.info("性能测试完毕，处理{}条数据的时间开销为={}, tps={}, 数据总量为={}MB({}MB/s)", Max, timeCost, Max/timeCost * 1000, totalBytes, totalBytes* 1000/(double)timeCost);
     }
 
     @AfterClass
