@@ -1,6 +1,8 @@
 package com.hao.walnut.mapfile;
 
 import lombok.extern.slf4j.Slf4j;
+import sun.misc.Cleaner;
+import sun.nio.ch.DirectBuffer;
 
 import java.io.File;
 import java.io.IOException;
@@ -308,11 +310,16 @@ public class MappedFile {
             if (mappedFileConf.flushStrategy == FlushStrategy.Batch) {
                 this.flush(null);
             }
+            for(MappedRange range : mappedRangeList) {
+                Cleaner cl = ((DirectBuffer)range.mappedByteBuffer).cleaner();
+                if (cl != null) {
+                    cl.clean();
+                    log.info("clean up mapped bytesbuffer");
+                }
+            }
             fileChannel.truncate(this.currentCommitFileSize());
             fileChannel.close();
             randomAccessFile.close();
-
-
         }
     }
 

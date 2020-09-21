@@ -46,6 +46,8 @@ public class MappedFileWriteTest {
 
         mappedFile.close();
         log.info("测试文件关闭");
+
+        mappedFile = new MappedFile(mappedFileConf);
         RandomAccessFile randomAccessFile = new RandomAccessFile(writeInt, "rw");
         randomAccessFile.seek(0);
         Assert.assertEquals(testVal, randomAccessFile.readInt());
@@ -65,7 +67,8 @@ public class MappedFileWriteTest {
         Assert.assertArrayEquals(testbytes, mappedFile.readBytes(4 + 8, readbytes));
         log.info("Write Bytes Success");
         randomAccessFile.close();
-//        writeInt.delete();
+        mappedFile.close();
+        writeInt.delete();
         log.info("测试完毕，删除临时文件");
     }
 
