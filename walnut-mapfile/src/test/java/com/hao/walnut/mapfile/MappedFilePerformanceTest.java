@@ -24,7 +24,7 @@ public class MappedFilePerformanceTest {
         StringBuilder sb = new StringBuilder();
 
         sb.append("start=========");
-        for(int i = 0; i < 2048; i++) {
+        for(int i = 0; i < 1024; i++) {
             sb.append((char)(i%128));
         }
         sb.append("========finish");
@@ -36,15 +36,15 @@ public class MappedFilePerformanceTest {
         MappedFileConf mappedFileConf = new MappedFileConf();
         mappedFileConf.file = data;
         MappedFile mappedFile = new MappedFile(mappedFileConf);
-        ExecutorService executorService = Executors.newCachedThreadPool();
-        int Max = 10000;
+        ExecutorService executorService = Executors.newFixedThreadPool(256);
+        int Max = 10;
         final AtomicInteger lock = new AtomicInteger();
         long start = System.currentTimeMillis();
         for(int i = 0; i < Max; i++) {
             executorService.execute(() -> {
                 try {
 //                    log.info("try to append {}", idx);
-                      mappedFile.append(testString.getBytes()).get();
+                      WriteResponse writeResponse = mappedFile.append(testString.getBytes()).get();
 //                    log.info("finish append {}", idx);
                     lock.incrementAndGet();
                 } catch (IOException | InterruptedException | ExecutionException e) {
@@ -65,7 +65,7 @@ public class MappedFilePerformanceTest {
 
     @AfterClass
     public static void teardown() {
-        data.delete();
-        temp.delete();
+//        data.delete();
+//        temp.delete();
     }
 }

@@ -90,8 +90,6 @@ public class MappedRange {
     synchronized int write(int position, ByteBuffer byteBuffer) throws IOException {
         checkWritePosition(position, byteBuffer.capacity());
         fileChannel.position(this.startOffset + position);
-        int writeCount = fileChannel.write(byteBuffer);
-        commitPosition.addAndGet(byteBuffer.capacity());
-        return writeCount;
+        return fileChannel.write(byteBuffer);
     }
 }

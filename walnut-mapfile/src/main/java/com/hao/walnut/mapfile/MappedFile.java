@@ -248,12 +248,14 @@ public class MappedFile {
 
 
     protected void flush(final WriteResponse writeResponse) throws IOException {
+        long beforeFlush = System.currentTimeMillis();
         fileChannel.force(false);
         this.lastFlushTimestamp = System.currentTimeMillis();
-
+        log.info("flush time cost = {}", lastFlushTimestamp - beforeFlush);
         if (this.mappedFileConf.flushStrategy == FlushStrategy.Batch) {
             while(this.flushQueue.size() > 0) {
-                WriteResponse item = this.flushQueue.remove();
+                WriteResponse item = this.flushQueue.poll();
+                if (item == null) break;
                 item.getWriteRequest().mappedRange.commitPosition.addAndGet(item.writeCount);
                 item.gmtCommit = System.currentTimeMillis();
                 if (item == writeResponse) {

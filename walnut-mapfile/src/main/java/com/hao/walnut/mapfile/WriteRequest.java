@@ -7,8 +7,8 @@ import java.util.List;
 @Getter
 public class WriteRequest {
     int position;
-    ByteBuffer data;
-    MappedRange mappedRange;
+    transient ByteBuffer data;
+    transient MappedRange mappedRange;
     List<WriteRequest> children;
     WriteRequest parent;
 }
