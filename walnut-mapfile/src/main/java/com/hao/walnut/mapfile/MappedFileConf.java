@@ -14,4 +14,6 @@ public class MappedFileConf {
     int rangeSize = DefaultRangeSize;
     FlushStrategy flushStrategy = FlushStrategy.Batch;
     int maxWriteThread = 128;
+    int batchFlushByteSize = 1024 * 4;
+    int flushTimeout = 100;
 }

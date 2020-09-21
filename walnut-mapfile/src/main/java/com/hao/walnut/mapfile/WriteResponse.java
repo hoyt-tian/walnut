@@ -3,6 +3,7 @@ package com.hao.walnut.mapfile;
 import lombok.Getter;
 
 import java.util.List;
+import java.util.concurrent.locks.ReentrantLock;
 
 @Getter
 public class WriteResponse {
@@ -10,10 +11,9 @@ public class WriteResponse {
     int writeCount;
     WriteRequest writeRequest;
     long gmtWrite;
-    long gmtFlush;
+    long gmtCommit = 0;
     long gmtCreate = System.currentTimeMillis();
     List<WriteResponse> children;
-
     public long position() {
         return writeRequest.mappedRange.startOffset + writeRequest.getPosition();
     }

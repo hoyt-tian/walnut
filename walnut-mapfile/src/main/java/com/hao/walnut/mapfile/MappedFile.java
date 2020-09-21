@@ -7,15 +7,10 @@ import java.io.IOException;
 import java.io.RandomAccessFile;
 import java.nio.ByteBuffer;
 import java.nio.channels.FileChannel;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.LinkedList;
-import java.util.List;
-import java.util.concurrent.ExecutionException;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-import java.util.concurrent.Future;
+import java.util.*;
+import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicLong;
 
 
 @Slf4j
@@ -27,14 +22,29 @@ public class MappedFile {
     protected int rangeSize;
     protected long originFileSize = 0;
     protected ExecutorService writeExecutor;
+    protected ExecutorService flushExecutor;
+    protected Queue<WriteResponse> flushQueue;
+    protected AtomicInteger flushBufferCount;
+    protected long lastFlushTimestamp;
+    protected MappedFileConf mappedFileConf;
 
     public MappedFile(MappedFileConf mappedFileConf) throws IOException {
+        this.mappedFileConf = mappedFileConf;
         this.file = mappedFileConf.file;
         this.randomAccessFile = new RandomAccessFile(mappedFileConf.file, "rw");
         this.originFileSize = randomAccessFile.length();
         this.fileChannel = this.randomAccessFile.getChannel();
         this.rangeSize = mappedFileConf.rangeSize;
         this.writeExecutor = Executors.newFixedThreadPool(mappedFileConf.maxWriteThread);
+        this.lastFlushTimestamp = System.currentTimeMillis();
+
+        if (mappedFileConf.flushStrategy == FlushStrategy.Batch) {
+            this.flushExecutor = Executors.newSingleThreadExecutor();
+            this.flushBufferCount = new AtomicInteger();
+            this.flushQueue = new ConcurrentLinkedQueue<>();
+            this.flushExecutor.execute(this::flushTimeout);
+        }
+
         Runtime.getRuntime().addShutdownHook(new Thread(() -> {
             try {
                 this.close();
@@ -131,9 +141,11 @@ public class MappedFile {
             w1.position = position;
             w1.data = ByteBuffer.wrap(p1);
             w1.mappedRange = startRange;
+            w1.parent = writeRequest;
             writeRequest.children.add(w1);
 
             WriteRequest w2 = new WriteRequest();
+            w2.parent = writeRequest;
             w2.position = 0;
             w2.data = ByteBuffer.wrap(p2);
             w2.mappedRange = endRange;
@@ -142,44 +154,69 @@ public class MappedFile {
         return execute(writeRequest);
     }
 
-    protected Future<WriteResponse> execute(final WriteRequest writeRequest) {
+    protected WriteResponse execute(final WriteRequest writeRequest, final WriteCallback callback) {
         if (writeRequest.children == null) {
 //            log.info("execute single insertion @={}, size={}", this.position + mappedRange.startOffset,data.capacity());
-            return writeExecutor.submit(() -> {
-                WriteResponse writeResponse = new WriteResponse();
-                writeResponse.writeRequest = writeRequest;
-                try {
-                    writeResponse.writeCount = writeRequest.mappedRange.write(writeRequest.position, writeRequest.data);
-                    writeResponse.gmtWrite = System.currentTimeMillis();
-                    writeResponse.success = true;
-                    return writeResponse;
-                } catch (IOException e) {
-                    writeResponse.success = false;
-                    return writeResponse;
-                }
-            });
+            WriteResponse writeResponse = new WriteResponse();
+            writeResponse.writeRequest = writeRequest;
+            try {
+                writeResponse.writeCount = writeRequest.mappedRange.write(writeRequest.position, writeRequest.data);
+                writeResponse.gmtWrite = System.currentTimeMillis();
+                writeResponse.success = true;
+                callback.call(writeResponse);
+                return writeResponse;
+            } catch (IOException e) {
+                writeResponse.success = false;
+                return writeResponse;
+            }
         } else {
 //            log.info("execute insertion with children, left=[@={},size={}], right=[@={},size={}]",left.position + left.mappedRange.startOffset, left.data.capacity(), right.position + right.mappedRange.startOffset, right.data.capacity());
-            return writeExecutor.submit(() -> {
-                WriteResponse response = new WriteResponse();
-                response.writeRequest = writeRequest;
-                response.success = true;
-                response.children = new LinkedList<>();
-                for(WriteRequest childWriteRequest : writeRequest.children) {
-                    Future<WriteResponse> responseFuture = execute(childWriteRequest);
-                    try {
-                        WriteResponse resp = responseFuture.get();
-                        response.success &= resp.success;
-                        response.children.add(resp);
-                    } catch (InterruptedException| ExecutionException e) {
-                        response.success = false;
-                        log.error("{}", e.getMessage());
-                        return response;
-                    }
-                }
-                return response;
-            });
+            WriteResponse writeResponse = new WriteResponse();
+            writeResponse.writeRequest = writeRequest;
+            writeResponse.success = true;
+            writeResponse.children = new LinkedList<>();
+            for(WriteRequest childWriteRequest : writeRequest.children) {
+                WriteResponse resp = execute(childWriteRequest, (w) -> {});
+                writeResponse.success &= resp.success;
+                writeResponse.children.add(resp);
+                writeResponse.writeCount += resp.writeCount;
+            }
+            try {
+                callback.call(writeResponse);
+            } catch (IOException e) {
+                writeResponse.success = false;
+            }
+            return writeResponse;
         }
+    }
+
+    protected Future<WriteResponse> execute(final WriteRequest writeRequest) {
+        return writeExecutor.submit(() -> {
+            WriteCallback callback = mappedFileConf.flushStrategy == FlushStrategy.Batch ? this::batchFlush : this::singleFlush;
+            return execute(writeRequest, callback);
+        });
+    }
+
+    protected void batchFlush(WriteResponse writeResponse) throws IOException {
+
+        this.flushBufferCount.addAndGet(writeResponse.writeCount);
+        this.flushQueue.add(writeResponse);
+
+        if (this.flushBufferCount.get() >= mappedFileConf.batchFlushByteSize) {
+            this.flush(writeResponse);
+        }
+
+        while(writeResponse.gmtCommit == 0) {
+            try {
+                Thread.sleep(20);
+            } catch (InterruptedException e) {
+                e.printStackTrace();
+            }
+        }
+    }
+
+    protected void singleFlush(WriteResponse writeResponse) throws IOException {
+        this.flush(writeResponse);
     }
 
 
@@ -208,8 +245,27 @@ public class MappedFile {
     }
 
 
-    public void flush() throws IOException {
-        fileChannel.force(true);
+    protected void flush(final WriteResponse writeResponse) throws IOException {
+        fileChannel.force(false);
+        this.lastFlushTimestamp = System.currentTimeMillis();
+
+        if (this.mappedFileConf.flushStrategy == FlushStrategy.Batch) {
+            while(this.flushQueue.size() > 0) {
+                WriteResponse item = this.flushQueue.remove();
+                item.getWriteRequest().mappedRange.commitPosition.addAndGet(item.writeCount);
+                item.gmtCommit = System.currentTimeMillis();
+                if (item == writeResponse) {
+                    break;
+                }
+            }
+        } else if (mappedFileConf.flushStrategy == FlushStrategy.Sync) {
+            if (writeResponse != null) {
+                writeResponse.getWriteRequest().mappedRange.commitPosition.addAndGet(writeResponse.writeCount);
+                writeResponse.gmtCommit = System.currentTimeMillis();
+            }
+        } else {
+            throw new IOException("Unsupported " + mappedFileConf.flushStrategy);
+        }
     }
 
     protected static void resize(int index, List<MappedRange> rangeList) {
@@ -249,10 +305,14 @@ public class MappedFile {
 
     public void close() throws IOException {
         if (fileChannel.isOpen()) {
-            long fileSize = currentCommitFileSize();
-            randomAccessFile.setLength(fileSize);
+            if (mappedFileConf.flushStrategy == FlushStrategy.Batch) {
+                this.flush(null);
+            }
+            fileChannel.truncate(this.currentCommitFileSize());
             fileChannel.close();
             randomAccessFile.close();
+
+
         }
     }
 
@@ -260,5 +320,25 @@ public class MappedFile {
     protected void finalize() throws Throwable {
         super.finalize();
         this.close();
+    }
+
+    protected void flushTimeout() {
+        while(true) {
+            long duration = System.currentTimeMillis() - lastFlushTimestamp;
+            if (duration > mappedFileConf.flushTimeout) {
+                try {
+                    log.info("flush timeout and prepare to flush");
+                    this.flush(null);
+                } catch (IOException e) {
+                    log.error("flush when timeout fail {}", e.getMessage());
+                }
+            }
+            long elasped = System.currentTimeMillis() - lastFlushTimestamp;
+            try {
+                Thread.sleep(System.currentTimeMillis() + (mappedFileConf.flushTimeout - elasped));
+            } catch (InterruptedException e) {
+                log.error("{}", e.getMessage());
+            }
+        }
     }
 }

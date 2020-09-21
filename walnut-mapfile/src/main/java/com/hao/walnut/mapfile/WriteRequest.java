@@ -10,4 +10,5 @@ public class WriteRequest {
     ByteBuffer data;
     MappedRange mappedRange;
     List<WriteRequest> children;
+    WriteRequest parent;
 }

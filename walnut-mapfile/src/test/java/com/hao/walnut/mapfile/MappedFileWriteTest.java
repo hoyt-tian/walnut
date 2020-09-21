@@ -26,6 +26,7 @@ public class MappedFileWriteTest {
     public void testWrite() throws IOException, ExecutionException, InterruptedException {
         File writeInt = new File(temp.getAbsoluteFile() + File.separator + "write.dat");
         MappedFileConf mappedFileConf = new MappedFileConf();
+        mappedFileConf.flushStrategy = FlushStrategy.Sync;
         mappedFileConf.file = writeInt;
         MappedFile mappedFile = new MappedFile(mappedFileConf);
         int testVal = 123;
@@ -41,7 +42,8 @@ public class MappedFileWriteTest {
         mappedFile.append(testbytes).get();
 
         log.info("写入字节数据{}", testbytes.length);
-        mappedFile.flush();
+        mappedFile.flush(null);
+
         mappedFile.close();
         log.info("测试文件关闭");
         RandomAccessFile randomAccessFile = new RandomAccessFile(writeInt, "rw");
@@ -63,8 +65,22 @@ public class MappedFileWriteTest {
         Assert.assertArrayEquals(testbytes, mappedFile.readBytes(4 + 8, readbytes));
         log.info("Write Bytes Success");
         randomAccessFile.close();
-        writeInt.delete();
+//        writeInt.delete();
         log.info("测试完毕，删除临时文件");
+    }
+
+    @Test
+    public void testTimeoutFlush() throws IOException, InterruptedException {
+        File file = new File(temp.getAbsoluteFile() + File.separator + "timeout.dat");
+        file.createNewFile();
+        MappedFileConf mappedFileConf = new MappedFileConf();
+        mappedFileConf.file = file;
+        mappedFileConf.flushTimeout = 2000;
+        MappedFile mappedFile = new MappedFile(mappedFileConf);
+        mappedFile.append("hello world test here for timeout!".getBytes());
+        Thread.sleep(3000);
+        mappedFile.close();
+        file.delete();
     }
 
     @AfterClass
