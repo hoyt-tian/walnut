@@ -13,6 +13,7 @@ import java.util.*;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.concurrent.locks.ReentrantLock;
 
 
 @Slf4j
@@ -20,13 +21,13 @@ public class MappedFile {
     protected FileChannel fileChannel;
     protected RandomAccessFile randomAccessFile;
     protected File file;
-    protected List<MappedRange> mappedRangeList = new ArrayList<MappedRange>();
+    protected List<MappedRange> mappedRangeList = new ArrayList<>();
     protected int rangeSize;
     protected long originFileSize = 0;
     protected ExecutorService writeExecutor;
     protected ExecutorService flushExecutor;
     protected Queue<WriteResponse> flushQueue;
-    protected AtomicInteger flushBufferCount;
+    protected AtomicLong flushBufferCount;
     protected long lastFlushTimestamp;
     protected MappedFileConf mappedFileConf;
 
@@ -42,7 +43,7 @@ public class MappedFile {
 
         if (mappedFileConf.flushStrategy == FlushStrategy.Batch) {
             this.flushExecutor = Executors.newSingleThreadExecutor();
-            this.flushBufferCount = new AtomicInteger();
+            this.flushBufferCount = new AtomicLong();
             this.flushQueue = new ConcurrentLinkedQueue<>();
             this.flushExecutor.execute(this::flushTimeout);
         }
@@ -200,21 +201,19 @@ public class MappedFile {
     }
 
     protected void batchFlush(WriteResponse writeResponse) throws IOException {
-
-        this.flushBufferCount.addAndGet(writeResponse.writeCount);
+        writeResponse.commitLock = new Semaphore(0);
+        this.flushBufferCount.addAndGet(writeResponse.writeBytesCount());
         this.flushQueue.add(writeResponse);
-
         if (this.flushBufferCount.get() >= mappedFileConf.batchFlushByteSize) {
+//            log.info("full in flush buffer, try to flush all of them");
             this.flush(writeResponse);
         }
-
-        while(writeResponse.gmtCommit == 0) {
-            try {
-                Thread.sleep(20);
-            } catch (InterruptedException e) {
-                e.printStackTrace();
-            }
+        try {
+            writeResponse.commitLock.acquire();
+        } catch (InterruptedException e) {
+            e.printStackTrace();
         }
+
     }
 
     protected void singleFlush(WriteResponse writeResponse) throws IOException {
@@ -248,24 +247,26 @@ public class MappedFile {
 
 
     protected void flush(final WriteResponse writeResponse) throws IOException {
-        long beforeFlush = System.currentTimeMillis();
+//        long beforeFlush = System.currentTimeMillis();
         fileChannel.force(false);
         this.lastFlushTimestamp = System.currentTimeMillis();
-        log.info("flush time cost = {}", lastFlushTimestamp - beforeFlush);
+//        log.info("flush time cost = {}", lastFlushTimestamp - beforeFlush);
         if (this.mappedFileConf.flushStrategy == FlushStrategy.Batch) {
             while(this.flushQueue.size() > 0) {
                 WriteResponse item = this.flushQueue.poll();
                 if (item == null) break;
-                item.getWriteRequest().mappedRange.commitPosition.addAndGet(item.writeCount);
-                item.gmtCommit = System.currentTimeMillis();
+                item.commit();
+                item.commitLock.release();
+                flushBufferCount.addAndGet(-item.writeBytesCount());
                 if (item == writeResponse) {
                     break;
                 }
             }
+
+//            log.info("batch flush finish");
         } else if (mappedFileConf.flushStrategy == FlushStrategy.Sync) {
             if (writeResponse != null) {
-                writeResponse.getWriteRequest().mappedRange.commitPosition.addAndGet(writeResponse.writeCount);
-                writeResponse.gmtCommit = System.currentTimeMillis();
+                writeResponse.commit();
             }
         } else {
             throw new IOException("Unsupported " + mappedFileConf.flushStrategy);
@@ -316,7 +317,6 @@ public class MappedFile {
                 Cleaner cl = ((DirectBuffer)range.mappedByteBuffer).cleaner();
                 if (cl != null) {
                     cl.clean();
-                    log.info("clean up mapped bytesbuffer");
                 }
             }
             fileChannel.truncate(this.currentCommitFileSize());
@@ -344,7 +344,9 @@ public class MappedFile {
             }
             long elasped = System.currentTimeMillis() - lastFlushTimestamp;
             try {
-                Thread.sleep(System.currentTimeMillis() + (mappedFileConf.flushTimeout - elasped));
+                if (elasped < mappedFileConf.flushTimeout) {
+                    Thread.sleep(mappedFileConf.flushTimeout - elasped);
+                }
             } catch (InterruptedException e) {
                 log.error("{}", e.getMessage());
             }

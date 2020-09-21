@@ -24,7 +24,7 @@ public class MappedFilePerformanceTest {
         StringBuilder sb = new StringBuilder();
 
         sb.append("start=========");
-        for(int i = 0; i < 1024; i++) {
+        for(int i = 0; i < 2048; i++) {
             sb.append((char)(i%128));
         }
         sb.append("========finish");
@@ -36,17 +36,18 @@ public class MappedFilePerformanceTest {
         MappedFileConf mappedFileConf = new MappedFileConf();
         mappedFileConf.file = data;
         MappedFile mappedFile = new MappedFile(mappedFileConf);
-        ExecutorService executorService = Executors.newFixedThreadPool(256);
-        int Max = 10;
-        final AtomicInteger lock = new AtomicInteger();
+        ExecutorService executorService = Executors.newFixedThreadPool(1000);
+        int Max = 1000000;
+        Semaphore semaphore = new Semaphore(1-Max);
         long start = System.currentTimeMillis();
         for(int i = 0; i < Max; i++) {
             executorService.execute(() -> {
                 try {
 //                    log.info("try to append {}", idx);
-                      WriteResponse writeResponse = mappedFile.append(testString.getBytes()).get();
+                      Future<WriteResponse> future = mappedFile.append(testString.getBytes());
+                      future.get();
 //                    log.info("finish append {}", idx);
-                    lock.incrementAndGet();
+                    semaphore.release();
                 } catch (IOException | InterruptedException | ExecutionException e) {
                     log.error("{}", e.getMessage());
                     e.printStackTrace();
@@ -54,9 +55,7 @@ public class MappedFilePerformanceTest {
             });
         }
         executorService.shutdown();
-        while(lock.get() < Max) {
-            Thread.sleep(10);
-        }
+        semaphore.acquire();
         mappedFile.close();
         long timeCost = System.currentTimeMillis() - start;
         long totalBytes = Max * testString.getBytes().length / (1024 * 1024) ;
