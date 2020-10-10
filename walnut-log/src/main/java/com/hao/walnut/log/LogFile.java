@@ -53,7 +53,8 @@ public class LogFile {
         long dataOffset = indexFile.readLong(offset * 8);
         int dataSize = dataFile.readInt(dataOffset);
         byte[] data = new byte[dataSize];
-        return dataFile.readBytes(dataOffset + 4, data);
+        dataFile.readBytes(dataOffset + 4, data);
+        return data;
     }
 
     /**

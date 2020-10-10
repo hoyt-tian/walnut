@@ -3,7 +3,6 @@ package com.hao.walnut.mapfile;
 import lombok.extern.slf4j.Slf4j;
 import sun.misc.Cleaner;
 import sun.nio.ch.DirectBuffer;
-
 import java.io.File;
 import java.io.IOException;
 import java.io.RandomAccessFile;
@@ -13,7 +12,6 @@ import java.util.*;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
-import java.util.concurrent.locks.ReentrantLock;
 
 
 @Slf4j
@@ -38,7 +36,8 @@ public class MappedFile {
         this.originFileSize = randomAccessFile.length();
         this.fileChannel = this.randomAccessFile.getChannel();
         this.rangeSize = mappedFileConf.rangeSize;
-        this.writeExecutor = Executors.newFixedThreadPool(mappedFileConf.maxWriteThread);
+        this.writeExecutor = mappedFileConf.writeExecutorService == null ?
+                mappedFileConf.writeExecutorService : Executors.newFixedThreadPool(mappedFileConf.maxWriteThread);
         this.lastFlushTimestamp = System.currentTimeMillis();
 
         if (mappedFileConf.flushStrategy == FlushStrategy.Batch) {

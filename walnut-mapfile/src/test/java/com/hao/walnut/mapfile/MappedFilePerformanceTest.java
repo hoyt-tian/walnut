@@ -8,7 +8,6 @@ import org.junit.Test;
 import java.io.File;
 import java.io.IOException;
 import java.util.concurrent.*;
-import java.util.concurrent.atomic.AtomicInteger;
 
 @Slf4j
 public class MappedFilePerformanceTest {
@@ -37,7 +36,7 @@ public class MappedFilePerformanceTest {
         mappedFileConf.file = data;
         MappedFile mappedFile = new MappedFile(mappedFileConf);
         ExecutorService executorService = Executors.newFixedThreadPool(1000);
-        int Max = 1000000;
+        int Max = 100000;
         Semaphore semaphore = new Semaphore(1-Max);
         long start = System.currentTimeMillis();
         for(int i = 0; i < Max; i++) {

@@ -34,7 +34,8 @@ public class MappedFileReadTest {
         Assert.assertEquals((int)1, mappedFile.readInt(0));
         Assert.assertEquals(2l, mappedFile.readLong(4));
         byte[] data = new byte[testBytes.length];
-        Assert.assertArrayEquals(testBytes, mappedFile.readBytes(12, data));
+        mappedFile.readBytes(12, data);
+        Assert.assertArrayEquals(testBytes, data);
     }
 
     @AfterClass

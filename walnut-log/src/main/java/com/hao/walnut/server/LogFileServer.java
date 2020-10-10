@@ -2,7 +2,6 @@ package com.hao.walnut.server;
 
 import com.hao.walnut.log.LogFile;
 import com.hao.walnut.log.LogFileConf;
-import com.hao.walnut.mapfile.MappedFile;
 import lombok.extern.slf4j.Slf4j;
 
 import java.io.File;

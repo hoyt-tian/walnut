@@ -64,7 +64,8 @@ public class MappedFileWriteTest {
         for(int i = 0; i < readbytes.length; i++) {
             readbytes[i] = 0x0;
         }
-        Assert.assertArrayEquals(testbytes, mappedFile.readBytes(4 + 8, readbytes));
+        mappedFile.readBytes(4 + 8, readbytes);
+        Assert.assertArrayEquals(testbytes, readbytes);
         log.info("Write Bytes Success");
         randomAccessFile.close();
         mappedFile.close();

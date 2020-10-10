@@ -4,6 +4,7 @@ import lombok.Getter;
 import lombok.Setter;
 
 import java.io.File;
+import java.util.concurrent.ExecutorService;
 
 @Getter
 @Setter
@@ -13,7 +14,8 @@ public class MappedFileConf {
     File file;
     int rangeSize = DefaultRangeSize;
     FlushStrategy flushStrategy = FlushStrategy.Batch;
-    int maxWriteThread = 128;
+    int maxWriteThread = 32;
     int batchFlushByteSize = 1024 * 100;
     int flushTimeout = 1000 * 5;
+    ExecutorService writeExecutorService;
 }
