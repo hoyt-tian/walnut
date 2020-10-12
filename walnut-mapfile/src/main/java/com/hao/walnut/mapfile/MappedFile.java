@@ -32,6 +32,10 @@ public class MappedFile {
     public MappedFile(MappedFileConf mappedFileConf) throws IOException {
         this.mappedFileConf = mappedFileConf;
         this.file = mappedFileConf.file;
+        if (!file.exists()) {
+            file.createNewFile();
+            log.info("{} does not exists, create new now!", file.getAbsolutePath());
+        }
         this.randomAccessFile = new RandomAccessFile(mappedFileConf.file, "rw");
         this.originFileSize = randomAccessFile.length();
         this.fileChannel = this.randomAccessFile.getChannel();

@@ -9,7 +9,6 @@
     <packaging>pom</packaging>
     <version>${revision}</version>
     <modules>
-        <module>walnut-log</module>
         <module>walnut-mapfile</module>
         <module>walnut-core</module>
     </modules>
